@@ -1,18 +1,17 @@
 package ast
 
-import "monkey/token"
-
-type node interface {
-	TokenLiteral() string
-}
+import (
+	"bytes"
+	"monkey/token"
+)
 
 type Statement interface {
-	node
+	Node
 	statement_node()
 }
 
 type expression interface {
-	node
+	Node
 	expression_node()
 }
 
@@ -27,8 +26,18 @@ type Let_statement struct {
 }
 
 type Return_statement struct {
-	Token token.Token
-	Value expression
+	Token        token.Token
+	Return_value expression
+}
+
+type Expression_statement struct {
+	Token      token.Token
+	Expression expression
+}
+
+type Node interface {
+	TokenLiteral() string
+	String() string
 }
 
 func (p *Program) TokenLiteral() string {
@@ -52,3 +61,53 @@ func (i *Identifier) TokenLiteral() string { return i.Token.Literal }
 
 func (rs *Return_statement) statement_node()      {}
 func (rs *Return_statement) TokenLiteral() string { return rs.Token.Literal }
+
+func (ex *Expression_statement) statement_node()      {}
+func (ex *Expression_statement) TokenLiteral() string { return ex.Token.Literal }
+
+func (p *Program) String() string {
+	var out bytes.Buffer
+
+	for _, s := range p.Statements {
+		out.WriteString(s.String())
+
+	}
+	return out.String()
+}
+
+func (ls *Let_statement) String() string {
+	var out bytes.Buffer
+
+	out.WriteString(ls.TokenLiteral() + " ")
+	out.WriteString(ls.Name.String())
+	out.WriteString(" = ")
+
+	if ls.Value != nil {
+		out.WriteString(ls.Value.String())
+	}
+
+	out.WriteString(";")
+	return out.String()
+}
+
+func (rs *Return_statement) String() string {
+	var out bytes.Buffer
+
+	out.WriteString(rs.TokenLiteral() + " ")
+	if rs.Return_value != nil {
+		out.WriteString(rs.Return_value.String())
+	}
+
+	out.WriteString(";")
+
+	return out.String()
+}
+
+func (es *Expression_statement) String() string {
+	if es.Expression != nil {
+		return es.Expression.String()
+	}
+	return ""
+}
+
+func (i *Identifier) String() string { return i.Value }
