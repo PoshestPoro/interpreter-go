@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"monkey/ast"
 	"monkey/lexer"
 	"monkey/token"
@@ -11,15 +12,26 @@ type Parser struct {
 
 	cur_token  token.Token
 	peek_token token.Token
+
+	errors []string
 }
 
 func New(l *lexer.Lexer) *Parser {
-	p := &Parser{l: l}
+	p := &Parser{l: l, errors: []string{}}
 
 	p.next_token()
 	p.next_token()
 
 	return p
+}
+
+func (p *Parser) Errors() []string {
+	return p.errors
+}
+
+func (p *Parser) peekError(t token.TokenType) {
+	msg := fmt.Sprintf("expected next token to be %s, got %s instead", t, p.peek_token.Type)
+	p.errors = append(p.errors, msg)
 }
 
 func (p *Parser) next_token() {
@@ -46,10 +58,22 @@ func (p *Parser) parse_statement() ast.Statement {
 	switch p.cur_token.Type {
 	case token.LET:
 		return p.parse_let_statement()
+	case token.RETURN:
+		return p.parse_return_statement()
 	default:
 		return nil
 	}
 
+}
+
+func (p *Parser) parse_return_statement() ast.Statement {
+	statement := &ast.Return_statement{Token: p.cur_token}
+	p.next_token()
+
+	for !p.cur_token_is(token.SEMICOLON) {
+		p.next_token()
+	}
+	return statement
 }
 
 func (p *Parser) parse_let_statement() ast.Statement {
@@ -83,6 +107,7 @@ func (p *Parser) expect_peek(t token.TokenType) bool {
 		p.next_token()
 		return true
 	} else {
+		p.peekError(t)
 		return false
 	}
 
