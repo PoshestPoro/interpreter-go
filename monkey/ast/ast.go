@@ -10,7 +10,7 @@ type Statement interface {
 	statement_node()
 }
 
-type expression interface {
+type Expression interface {
 	Node
 	expression_node()
 }
@@ -22,17 +22,35 @@ type Program struct {
 type Let_statement struct {
 	Token token.Token
 	Name  *Identifier
-	Value expression
+	Value Expression
 }
 
 type Return_statement struct {
 	Token        token.Token
-	Return_value expression
+	Return_value Expression
+}
+
+type Integer_literal struct {
+	token.Token
+	Value int64
+}
+
+type Prefix_expression struct {
+	Token    token.Token
+	Operator string
+	Right    Expression
+}
+
+type Infix_expression struct {
+	Token    token.Token
+	Operator string
+	Right    Expression
+	Left     Expression
 }
 
 type Expression_statement struct {
 	Token      token.Token
-	Expression expression
+	Expression Expression
 }
 
 type Node interface {
@@ -64,6 +82,40 @@ func (rs *Return_statement) TokenLiteral() string { return rs.Token.Literal }
 
 func (ex *Expression_statement) statement_node()      {}
 func (ex *Expression_statement) TokenLiteral() string { return ex.Token.Literal }
+
+func (il *Integer_literal) expression_node()     {}
+func (il *Integer_literal) TokenLiteral() string { return il.Token.Literal }
+
+func (pe *Prefix_expression) expression_node()     {}
+func (pe *Prefix_expression) TokenLiteral() string { return pe.Token.Literal }
+
+func (ie *Infix_expression) expression_node()     {}
+func (ie *Infix_expression) TokenLiteral() string { return ie.Token.Literal }
+
+func (ie Infix_expression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("(")
+	out.WriteString(ie.Left.String())
+	out.WriteString(" " + ie.Operator + " ")
+	out.WriteString(ie.Right.String())
+	out.WriteString(")")
+
+	return out.String()
+}
+
+func (il *Integer_literal) String() string { return il.Token.Literal }
+
+func (pe *Prefix_expression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("(")
+	out.WriteString(pe.Operator)
+	out.WriteString(pe.Right.String())
+	out.WriteString(")")
+
+	return out.String()
+}
 
 func (p *Program) String() string {
 	var out bytes.Buffer
