@@ -74,6 +74,8 @@ func New(l *lexer.Lexer) *Parser {
 }
 
 func (p *Parser) parse_infix_expression(left ast.Expression) ast.Expression {
+	defer untrace(trace("prefix_infix_expression"))
+
 	expr := &ast.Infix_expression{
 		Token:    p.cur_token,
 		Operator: p.cur_token.Literal,
@@ -99,6 +101,7 @@ func (p *Parser) cur_precendence() int {
 }
 
 func (p *Parser) parse_prefix_expression() ast.Expression {
+	defer untrace(trace("parse_prefix_expression"))
 	exp := &ast.Prefix_expression{Token: p.cur_token, Operator: p.cur_token.Literal}
 
 	p.next_token()
@@ -109,6 +112,7 @@ func (p *Parser) parse_prefix_expression() ast.Expression {
 }
 
 func (p *Parser) parse_integer_literal() ast.Expression {
+	defer untrace(trace("parse_integer_literal"))
 	lit := &ast.Integer_literal{Token: p.cur_token}
 
 	value, err := strconv.ParseInt(p.cur_token.Literal, 0, 64)
@@ -169,6 +173,7 @@ func (p *Parser) parse_statement() ast.Statement {
 }
 
 func (p *Parser) parse_expression_statement() ast.Statement {
+	defer untrace(trace("parse_expression_statement"))
 	statement := &ast.Expression_statement{Token: p.cur_token}
 
 	statement.Expression = p.parse_expression(LOWEST)
@@ -180,6 +185,7 @@ func (p *Parser) parse_expression_statement() ast.Statement {
 }
 
 func (p *Parser) parse_expression(precedence int) ast.Expression {
+	defer untrace(trace("parse_expression"))
 	prefix := p.prefix_Parse_Fns[p.cur_token.Type]
 
 	if prefix == nil {
