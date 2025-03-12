@@ -30,9 +30,26 @@ type Return_statement struct {
 	Return_value Expression
 }
 
+type Boolean struct {
+	Token token.Token
+	Value bool
+}
+
 type Integer_literal struct {
 	token.Token
 	Value int64
+}
+
+type If_expression struct {
+	Token       token.Token
+	Condition   Expression
+	Consequence *Block_statement
+	Alternative *Block_statement
+}
+
+type Block_statement struct {
+	Token      token.Token
+	Statements []Statement
 }
 
 type Prefix_expression struct {
@@ -91,6 +108,41 @@ func (pe *Prefix_expression) TokenLiteral() string { return pe.Token.Literal }
 
 func (ie *Infix_expression) expression_node()     {}
 func (ie *Infix_expression) TokenLiteral() string { return ie.Token.Literal }
+
+func (b *Boolean) expression_node()     {}
+func (b *Boolean) TokenLiteral() string { return b.Token.Literal }
+func (b *Boolean) String() string       { return b.Token.Literal }
+
+func (ie *If_expression) expression_node()     {}
+func (ie *If_expression) TokenLiteral() string { return ie.Token.Literal }
+
+func (bs *Block_statement) expression_node()     {}
+func (bs *Block_statement) TokenLiteral() string { return bs.Token.Literal }
+
+func (bs *Block_statement) String() string {
+	var out bytes.Buffer
+
+	for _, s := range bs.Statements {
+		out.WriteString(s.String())
+	}
+	return out.String()
+}
+
+func (ie *If_expression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("if")
+	out.WriteString(ie.Condtition.String())
+	out.WriteString(" ")
+	out.WriteString(ie.Consequence.String())
+
+	if ie.Alternative != nil {
+		out.WriteString("else")
+		out.WriteString(ie.Alternative.String())
+	}
+
+	return out.String()
+}
 
 func (ie Infix_expression) String() string {
 	var out bytes.Buffer

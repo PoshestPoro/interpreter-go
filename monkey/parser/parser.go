@@ -60,6 +60,10 @@ func New(l *lexer.Lexer) *Parser {
 	p.register_prefix(token.INT, p.parse_integer_literal)
 	p.register_prefix(token.BANG, p.parse_prefix_expression)
 	p.register_prefix(token.MINUS, p.parse_prefix_expression)
+	p.register_prefix(token.TRUE, p.parse_prefix_expression)
+	p.register_prefix(token.FALSE, p.parse_prefix_expression)
+	p.register_prefix(token.LPAREN, p.parse_grouped_expression)
+	p.register_prefix(token.IF, p.parse_if_expression)
 
 	p.register_infix(token.PLUS, p.parse_infix_expression)
 	p.register_infix(token.MINUS, p.parse_infix_expression)
@@ -71,6 +75,73 @@ func New(l *lexer.Lexer) *Parser {
 	p.register_infix(token.GT, p.parse_infix_expression)
 
 	return p
+}
+
+func (p *Parser) parse_if_expression() ast.Expression {
+	expr := &ast.If_expression{Token: p.cur_token}
+
+	if !p.expect_peek(token.LPAREN) {
+		return nil
+	}
+
+	p.next_token()
+
+	expr.Condition = p.parse_expression(LOWEST)
+
+	if !p.expect_peek(token.RPAREN) {
+		return nil
+	}
+
+	if !p.expect_peek(token.LBRACE) {
+		return nil
+	}
+
+	expr.Consequence = p.parse_block_statement()
+
+	if !p.peek_token_is(token.ELSE) {
+		return expr
+	}
+	if !p.expect_peek(token.LBRACE) {
+		return nil
+	}
+	p.next_token()
+	expr.Alternative = p.parse_block_statement()
+
+	return expr
+
+}
+
+func (p *Parser) parse_block_statement() *ast.Block_statement {
+	expr := &ast.Block_statement{Token: p.cur_token}
+	expr.Statements = []ast.Statement{}
+
+	p.next_token()
+
+	for !p.cur_token_is(token.RBRACE) && !p.cur_token_is(token.EOF) {
+		stmt := p.parse_statement()
+		if stmt != nil {
+			expr.Statements = append(expr.Statements, stmt)
+		}
+		p.next_token()
+
+	}
+	return expr
+
+}
+
+func (p *Parser) parse_grouped_expression() ast.Expression {
+	p.next_token()
+
+	expr := p.parse_expression(LOWEST)
+
+	if !p.expect_peek(token.RPAREN) {
+		return nil
+	}
+	return expr
+}
+
+func (p *Parser) parse_boolean() ast.Expression {
+	return &ast.Boolean{Token: p.cur_token, Value: p.cur_token_is(token.TRUE)}
 }
 
 func (p *Parser) parse_infix_expression(left ast.Expression) ast.Expression {
