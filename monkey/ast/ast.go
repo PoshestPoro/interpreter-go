@@ -3,6 +3,7 @@ package ast
 import (
 	"bytes"
 	"monkey/token"
+	"strings"
 )
 
 type Statement interface {
@@ -23,6 +24,12 @@ type Let_statement struct {
 	Token token.Token
 	Name  *Identifier
 	Value Expression
+}
+
+type Function_literal struct {
+	Token      token.Token
+	Parameters []*Identifier
+	Body       *Block_statement
 }
 
 type Return_statement struct {
@@ -68,6 +75,12 @@ type Infix_expression struct {
 type Expression_statement struct {
 	Token      token.Token
 	Expression Expression
+}
+
+type Call_expression struct {
+	Token     token.Token
+	Function  Expression
+	Arguments []Expression
 }
 
 type Node interface {
@@ -119,6 +132,44 @@ func (ie *If_expression) TokenLiteral() string { return ie.Token.Literal }
 func (bs *Block_statement) expression_node()     {}
 func (bs *Block_statement) TokenLiteral() string { return bs.Token.Literal }
 
+func (fl *Function_literal) expression_node()     {}
+func (fl *Function_literal) TokenLiteral() string { return fl.Token.Literal }
+
+func (ce *Call_expression) expression_node()     {}
+func (ce *Call_expression) TokenLiteral() string { return ce.Token.Literal }
+
+func (ce *Call_expression) String() string {
+	var out bytes.Buffer
+
+	arguments := []string{}
+
+	for _, p := range ce.Arguments {
+		arguments = append(arguments, p.String())
+	}
+
+	out.WriteString(ce.Function.String())
+	out.WriteString("(")
+	out.WriteString(strings.Join(arguments, ", "))
+	out.WriteString(")")
+	return out.String()
+}
+
+func (fl *Function_literal) String() string {
+	var out bytes.Buffer
+
+	params := []string{}
+	for _, p := range fl.Parameters {
+		params = append(params, p.String())
+	}
+	out.WriteString(fl.TokenLiteral())
+	out.WriteString("(")
+	out.WriteString(strings.Join(params, ", "))
+	out.WriteString(") ")
+	out.WriteString(fl.Body.String())
+
+	return out.String()
+}
+
 func (bs *Block_statement) String() string {
 	var out bytes.Buffer
 
@@ -132,7 +183,7 @@ func (ie *If_expression) String() string {
 	var out bytes.Buffer
 
 	out.WriteString("if")
-	out.WriteString(ie.Condtition.String())
+	out.WriteString(ie.Condition.String())
 	out.WriteString(" ")
 	out.WriteString(ie.Consequence.String())
 

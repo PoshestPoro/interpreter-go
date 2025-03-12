@@ -33,6 +33,7 @@ var precedences = map[token.TokenType]int{
 	token.MINUS:    SUM,
 	token.SLASH:    PRODUCT,
 	token.ASTERISK: PRODUCT,
+	token.LPAREN:   CALL,
 }
 
 type Parser struct {
@@ -60,10 +61,11 @@ func New(l *lexer.Lexer) *Parser {
 	p.register_prefix(token.INT, p.parse_integer_literal)
 	p.register_prefix(token.BANG, p.parse_prefix_expression)
 	p.register_prefix(token.MINUS, p.parse_prefix_expression)
-	p.register_prefix(token.TRUE, p.parse_prefix_expression)
-	p.register_prefix(token.FALSE, p.parse_prefix_expression)
+	p.register_prefix(token.TRUE, p.parse_boolean)
+	p.register_prefix(token.FALSE, p.parse_boolean)
 	p.register_prefix(token.LPAREN, p.parse_grouped_expression)
 	p.register_prefix(token.IF, p.parse_if_expression)
+	p.register_prefix(token.FUNCTION, p.parse_function_literal)
 
 	p.register_infix(token.PLUS, p.parse_infix_expression)
 	p.register_infix(token.MINUS, p.parse_infix_expression)
@@ -73,8 +75,79 @@ func New(l *lexer.Lexer) *Parser {
 	p.register_infix(token.NOT_EQ, p.parse_infix_expression)
 	p.register_infix(token.LT, p.parse_infix_expression)
 	p.register_infix(token.GT, p.parse_infix_expression)
+	p.register_infix(token.LPAREN, p.parse_call_expression)
 
 	return p
+}
+
+func (p *Parser) parse_call_expression(function ast.Expression) ast.Expression {
+	expr := &ast.Call_expression{Token: p.cur_token, Function: function}
+	expr.Arguments = p.parse_call_arguments()
+	return expr
+}
+
+func (p *Parser) parse_call_arguments() []ast.Expression {
+	arguments := []ast.Expression{}
+
+	if p.peek_token_is(token.RPAREN) {
+		p.next_token()
+		return arguments
+	}
+	p.next_token()
+	arguments = append(arguments, p.parse_expression(LOWEST))
+
+	for p.peek_token_is(token.COMMA) {
+		p.next_token()
+		p.next_token()
+		arguments = append(arguments, p.parse_expression(LOWEST))
+
+	}
+	if !p.expect_peek(token.RPAREN) {
+		return nil
+	}
+	return arguments
+}
+
+func (p *Parser) parse_function_literal() ast.Expression {
+	expr := &ast.Function_literal{Token: p.cur_token}
+	if !p.expect_peek(token.LPAREN) {
+		return nil
+	}
+
+	expr.Parameters = p.parse_function_parameters()
+
+	if !p.expect_peek(token.LBRACE) {
+		return nil
+	}
+
+	expr.Body = p.parse_block_statement()
+
+	return expr
+}
+
+func (p *Parser) parse_function_parameters() []*ast.Identifier {
+	identifiers := []*ast.Identifier{}
+
+	if p.peek_token_is(token.RPAREN) {
+		p.next_token()
+		return identifiers
+	}
+	p.next_token()
+	ident := &ast.Identifier{Token: p.cur_token, Value: p.cur_token.Literal}
+	identifiers = append(identifiers, ident)
+
+	for p.peek_token_is(token.COMMA) {
+		p.next_token()
+		p.next_token()
+		ident := &ast.Identifier{Token: p.cur_token, Value: p.cur_token.Literal}
+		identifiers = append(identifiers, ident)
+	}
+	if !p.expect_peek(token.RPAREN) {
+		return nil
+	}
+
+	return identifiers
+
 }
 
 func (p *Parser) parse_if_expression() ast.Expression {
@@ -98,14 +171,14 @@ func (p *Parser) parse_if_expression() ast.Expression {
 
 	expr.Consequence = p.parse_block_statement()
 
-	if !p.peek_token_is(token.ELSE) {
-		return expr
+	if p.peek_token_is(token.ELSE) {
+		p.next_token()
+
+		if !p.expect_peek(token.LBRACE) {
+			return nil
+		}
+		expr.Alternative = p.parse_block_statement()
 	}
-	if !p.expect_peek(token.LBRACE) {
-		return nil
-	}
-	p.next_token()
-	expr.Alternative = p.parse_block_statement()
 
 	return expr
 
@@ -145,8 +218,6 @@ func (p *Parser) parse_boolean() ast.Expression {
 }
 
 func (p *Parser) parse_infix_expression(left ast.Expression) ast.Expression {
-	defer untrace(trace("prefix_infix_expression"))
-
 	expr := &ast.Infix_expression{
 		Token:    p.cur_token,
 		Operator: p.cur_token.Literal,
@@ -172,7 +243,6 @@ func (p *Parser) cur_precendence() int {
 }
 
 func (p *Parser) parse_prefix_expression() ast.Expression {
-	defer untrace(trace("parse_prefix_expression"))
 	exp := &ast.Prefix_expression{Token: p.cur_token, Operator: p.cur_token.Literal}
 
 	p.next_token()
@@ -183,7 +253,6 @@ func (p *Parser) parse_prefix_expression() ast.Expression {
 }
 
 func (p *Parser) parse_integer_literal() ast.Expression {
-	defer untrace(trace("parse_integer_literal"))
 	lit := &ast.Integer_literal{Token: p.cur_token}
 
 	value, err := strconv.ParseInt(p.cur_token.Literal, 0, 64)
@@ -244,7 +313,6 @@ func (p *Parser) parse_statement() ast.Statement {
 }
 
 func (p *Parser) parse_expression_statement() ast.Statement {
-	defer untrace(trace("parse_expression_statement"))
 	statement := &ast.Expression_statement{Token: p.cur_token}
 
 	statement.Expression = p.parse_expression(LOWEST)
@@ -256,7 +324,6 @@ func (p *Parser) parse_expression_statement() ast.Statement {
 }
 
 func (p *Parser) parse_expression(precedence int) ast.Expression {
-	defer untrace(trace("parse_expression"))
 	prefix := p.prefix_Parse_Fns[p.cur_token.Type]
 
 	if prefix == nil {
@@ -283,7 +350,9 @@ func (p *Parser) parse_return_statement() ast.Statement {
 	statement := &ast.Return_statement{Token: p.cur_token}
 	p.next_token()
 
-	for !p.cur_token_is(token.SEMICOLON) {
+	statement.Return_value = p.parse_expression(LOWEST)
+
+	if p.peek_token_is(token.SEMICOLON) {
 		p.next_token()
 	}
 	return statement
@@ -300,8 +369,10 @@ func (p *Parser) parse_let_statement() ast.Statement {
 	if !p.expect_peek(token.ASSIGN) {
 		return nil
 	}
+	p.next_token()
 
-	for !p.cur_token_is(token.SEMICOLON) {
+	statement.Value = p.parse_expression(LOWEST)
+	if p.peek_token_is(token.SEMICOLON) {
 		p.next_token()
 	}
 	return statement
